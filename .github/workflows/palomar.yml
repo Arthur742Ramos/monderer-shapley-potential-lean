@@ -1,0 +1,37 @@
+name: Palomar mechanical verification
+on:
+  workflow_dispatch:
+    inputs:
+      authorization_relationship:
+        description: "Your actual authorized relationship to this formalization"
+        required: true
+        type: choice
+        options:
+          - I am a responsible author or maintainer
+          - I am submitting on behalf of a responsible author or maintainer
+      approve_binary_scoped_apparmor:
+        description: "Set true only after specific approval for the official exact-bubblewrap userns profile on the disposable hosted runner if required"
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  require-runner-security-approval:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require specific approval before invoking the official conditional installer
+        env:
+          APPROVED: ${{ inputs.approve_binary_scoped_apparmor }}
+        run: test "$APPROVED" = true
+  palomar-full:
+    needs: require-runner-security-approval
+    uses: PalomarRegistry/PalomarSubmission/.github/workflows/submission.yml@65f0154ed776cd26c224254aa57b379137f28b0d
+    with:
+      repository: ${{ github.repository }}
+      commit: ${{ github.sha }}
+      pipeline_commit: 65f0154ed776cd26c224254aa57b379137f28b0d
+      request_id: potential001
+      mode: full
+      execution_profile: palomar-standard-v1
+      options: ${{ format('{{"comparator_config_path":"comparator.json","authorization_relationship":"{0}"}}', inputs.authorization_relationship) }}

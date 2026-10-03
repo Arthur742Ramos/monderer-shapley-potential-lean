@@ -1,0 +1,17 @@
+{
+  "challenge_module": "Challenge",
+  "solution_module": "Solution",
+  "theorem_names": [
+    "Potential.monderer_shapley_characterization",
+    "Potential.exactPotential_unique",
+    "Potential.fourCycle_exists_pureNash"
+  ],
+  "definition_names": [
+    "Potential.Profile", "Potential.Payoff", "Potential.ExactPotential",
+    "Potential.FourCycle", "Potential.Move", "Potential.endpoint",
+    "Potential.pathIntegral", "Potential.ClosedPathProperty", "Potential.PureNash",
+    "Potential.vertices", "Potential.SimpleClosedPathProperty", "Potential.SimpleFourCycleProperty"
+  ],
+  "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+  "enable_nanoda": true
+}
