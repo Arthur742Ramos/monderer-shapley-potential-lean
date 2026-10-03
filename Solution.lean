@@ -43,19 +43,52 @@ may equal its current value; no artificial finiteness restriction on actions. -/
 abbrev Move {I : Type*} (A : I → Type*) := Σ i, A i
 
 def endpoint {I : Type*} {A : I → Type*} [DecidableEq I]
-    (s : Profile A) : List (Move A) → Profile A
-  | [] => s
-  | m :: ms => endpoint (Function.update s m.1 m.2) ms
+    (s : Profile A) (ms : List (Move A)) : Profile A :=
+  ms.foldl (fun s m => Function.update s m.1 m.2) s
 
 def pathIntegral {I : Type*} {A : I → Type*} [DecidableEq I]
-    (u : Payoff A) (s : Profile A) : List (Move A) → ℝ
-  | [] => 0
-  | m :: ms => u m.1 (Function.update s m.1 m.2) - u m.1 s +
-      pathIntegral u (Function.update s m.1 m.2) ms
+    (u : Payoff A) (s : Profile A) (ms : List (Move A)) : ℝ :=
+  (ms.foldl (fun p m => (p.1 + u m.1 (Function.update p.2 m.1 m.2) - u m.1 p.2,
+    Function.update p.2 m.1 m.2)) (0, s)).1
 
 def ClosedPathProperty {I : Type*} {A : I → Type*} [DecidableEq I]
     (u : Payoff A) : Prop :=
   ∀ s ms, endpoint s ms = s → pathIntegral u s ms = 0
+
+lemma endpoint_nil {I : Type*} {A : I → Type*} [DecidableEq I]
+    (s : Profile A) : endpoint s [] = s := by
+  simp only [endpoint, List.foldl_nil]
+
+lemma endpoint_cons {I : Type*} {A : I → Type*} [DecidableEq I]
+    (s : Profile A) (m : Move A) (ms : List (Move A)) :
+    endpoint s (m :: ms) = endpoint (Function.update s m.1 m.2) ms := by
+  simp only [endpoint, List.foldl_cons]
+
+lemma pathIntegral_nil {I : Type*} {A : I → Type*} [DecidableEq I]
+    (u : Payoff A) (s : Profile A) : pathIntegral u s [] = 0 := by
+  simp only [pathIntegral, List.foldl_nil]
+
+private lemma pathIntegral_foldl_add {I : Type*} {A : I → Type*} [DecidableEq I]
+    (u : Payoff A) (s : Profile A) (ms : List (Move A)) (c : ℝ) :
+    (ms.foldl (fun p m => (p.1 + u m.1 (Function.update p.2 m.1 m.2) - u m.1 p.2,
+      Function.update p.2 m.1 m.2)) (c, s)).1 = c + pathIntegral u s ms := by
+  induction ms generalizing s c with
+  | nil => simp only [List.foldl_nil, pathIntegral_nil, add_zero]
+  | cons m ms ih =>
+    simp only [pathIntegral, List.foldl_cons, zero_add] at ih ⊢
+    rw [ih (Function.update s m.1 m.2)
+      (c + u m.1 (Function.update s m.1 m.2) - u m.1 s),
+      ih (Function.update s m.1 m.2)
+        (u m.1 (Function.update s m.1 m.2) - u m.1 s)]
+    ring
+
+lemma pathIntegral_cons {I : Type*} {A : I → Type*} [DecidableEq I]
+    (u : Payoff A) (s : Profile A) (m : Move A) (ms : List (Move A)) :
+    pathIntegral u s (m :: ms) = u m.1 (Function.update s m.1 m.2) - u m.1 s +
+      pathIntegral u (Function.update s m.1 m.2) ms := by
+  simp only [pathIntegral, List.foldl_cons, zero_add]
+  exact pathIntegral_foldl_add u (Function.update s m.1 m.2) ms
+    (u m.1 (Function.update s m.1 m.2) - u m.1 s)
 
 /-- No player can improve its payoff by a unilateral deviation. -/
 def PureNash {I : Type*} {A : I → Type*} [DecidableEq I]
@@ -178,9 +211,9 @@ theorem exactPotential_pathIntegral (u : Payoff A) (P : Profile A → ℝ)
     (hp : ExactPotential u P) (s : Profile A) (ms : List (Move A)) :
     pathIntegral u s ms = P (endpoint s ms) - P s := by
   induction ms generalizing s with
-  | nil => simp [pathIntegral, endpoint]
+  | nil => simp [pathIntegral_nil, endpoint_nil]
   | cons m ms ih =>
-    simp only [pathIntegral, endpoint, ih]
+    rw [pathIntegral_cons, endpoint_cons, ih]
     have := hp s m.1 m.2
     linarith
 
@@ -205,10 +238,10 @@ theorem closedPaths_fourCycle (u : Payoff A) (h : ClosedPathProperty u) : FourCy
   intro s i j hij a b
   let ms : List (Move A) := [⟨i, a⟩, ⟨j, b⟩, ⟨i, s i⟩, ⟨j, s j⟩]
   have he : endpoint s ms = s := by
-    simp only [ms, endpoint]
+    simp only [ms, endpoint_cons, endpoint_nil]
     rw [rectangle_return s i j hij a b, Function.update_idem, Function.update_eq_self]
   have hz := h s ms he
-  simp only [ms, pathIntegral] at hz
+  simp only [ms, pathIntegral_cons, pathIntegral_nil] at hz
   rw [rectangle_return s i j hij a b, Function.update_idem, Function.update_eq_self] at hz
   linarith
 
@@ -233,11 +266,13 @@ theorem remove_noop_moves (u : Payoff A) (s : Profile A) (ms : List (Move A)) :
         rw [hm, Function.update_eq_self]
       obtain ⟨ns, hn, he, hv⟩ := ih s
       refine ⟨ns, hn, ?_, ?_⟩
-      · simpa only [endpoint, hu] using he
-      · simpa only [pathIntegral, hu, sub_self, zero_add] using hv
+      · simpa only [endpoint_cons, hu] using he
+      · simpa only [pathIntegral_cons, hu, sub_self, zero_add] using hv
     · obtain ⟨ns, hn, he, hv⟩ := ih (Function.update s m.1 m.2)
-      exact ⟨m :: ns, ⟨hm, hn⟩, he, congrArg
-        (fun z => u m.1 (Function.update s m.1 m.2) - u m.1 s + z) hv⟩
+      refine ⟨m :: ns, ⟨hm, hn⟩, ?_, ?_⟩
+      · simpa only [endpoint_cons] using he
+      · simpa only [pathIntegral_cons] using congrArg
+          (fun z => u m.1 (Function.update s m.1 m.2) - u m.1 s + z) hv
 
 theorem closedPaths_iff_actualClosedPaths (u : Payoff A) :
     ClosedPathProperty u ↔ ActualClosedPathProperty u := by
@@ -254,9 +289,9 @@ lemma endpoint_setMoves (base target : Profile A) (is : List I) (j : I) :
     endpoint base (is.map (fun i => (⟨i, target i⟩ : Move A))) j =
       if j ∈ is then target j else base j := by
   induction is generalizing base with
-  | nil => simp [endpoint]
+  | nil => simp [endpoint_nil]
   | cons i is ih =>
-    simp only [List.map_cons, endpoint, ih, List.mem_cons]
+    simp only [List.map_cons, endpoint_cons, ih, List.mem_cons]
     by_cases hji : j = i
     · subst j
       simp
@@ -290,9 +325,29 @@ namespace Potential
 variable {I : Type*} {A : I → Type*} [DecidableEq I]
 
 /-- The initial profile and each subsequent profile along a deviation path. -/
-def vertices (s : Profile A) : List (Move A) → List (Profile A)
-  | [] => [s]
-  | m :: ms => s :: vertices (Function.update s m.1 m.2) ms
+def vertices (s : Profile A) (ms : List (Move A)) : List (Profile A) :=
+  (ms.foldl (fun p m => (Function.update p.1 m.1 m.2, p.2 ++ [Function.update p.1 m.1 m.2])) (s, [s])).2
+
+lemma vertices_nil (s : Profile A) : vertices s [] = [s] := by
+  simp only [vertices, List.foldl_nil]
+
+private lemma vertices_foldl_prefix (s : Profile A) (ms : List (Move A))
+    (pre acc : List (Profile A)) :
+    (ms.foldl (fun p m => (Function.update p.1 m.1 m.2,
+      p.2 ++ [Function.update p.1 m.1 m.2])) (s, pre ++ acc)).2 =
+      pre ++ (ms.foldl (fun p m => (Function.update p.1 m.1 m.2,
+        p.2 ++ [Function.update p.1 m.1 m.2])) (s, acc)).2 := by
+  induction ms generalizing s acc with
+  | nil => rfl
+  | cons m ms ih =>
+    simpa only [List.foldl_cons, List.append_assoc] using
+      ih (Function.update s m.1 m.2) (acc ++ [Function.update s m.1 m.2])
+
+lemma vertices_cons (s : Profile A) (m : Move A) (ms : List (Move A)) :
+    vertices s (m :: ms) = s :: vertices (Function.update s m.1 m.2) ms := by
+  simpa only [vertices, List.foldl_cons, List.singleton_append] using
+    vertices_foldl_prefix (Function.update s m.1 m.2) ms [s]
+      [Function.update s m.1 m.2]
 
 /-- A closed path is simple when its profiles before the return are distinct. -/
 def SimpleClosedPathProperty (u : Payoff A) : Prop :=
@@ -336,7 +391,7 @@ lemma rectangle_vertices_nodup (s : Profile A) (i j : I) (hij : i ≠ j)
   have hCD : Function.update (Function.update s i a) j b ≠ Function.update s j b := by
     intro he
     exact ha (by simpa [hij] using congrFun he i)
-  simp only [vertices, List.dropLast_cons_cons, List.dropLast_singleton]
+  simp only [vertices_cons, vertices_nil, List.dropLast_cons_cons, List.dropLast_singleton]
   rw [rectangle_return s i j hij a b]
   simp [List.nodup_cons, hsB, hsC, hsD, hBC, hBD, hCD]
 
@@ -357,11 +412,11 @@ theorem simpleFourCycles_fourCycle (u : Payoff A) (h : SimpleFourCycleProperty u
       ring
     · let ms : List (Move A) := [⟨i, a⟩, ⟨j, b⟩, ⟨i, s i⟩, ⟨j, s j⟩]
       have he : endpoint s ms = s := by
-        simp only [ms, endpoint]
+        simp only [ms, endpoint_cons, endpoint_nil]
         rw [rectangle_return s i j hij a b, Function.update_idem, Function.update_eq_self]
       have hn : (vertices s ms).dropLast.Nodup := rectangle_vertices_nodup s i j hij a b ha hb
       have hz := h s ms he hn (by rfl)
-      simp only [ms, pathIntegral] at hz
+      simp only [ms, pathIntegral_cons, pathIntegral_nil] at hz
       rw [rectangle_return s i j hij a b, Function.update_idem, Function.update_eq_self] at hz
       linarith
 

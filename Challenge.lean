@@ -43,15 +43,13 @@ may equal its current value; no artificial finiteness restriction on actions. -/
 abbrev Move {I : Type*} (A : I → Type*) := Σ i, A i
 
 def endpoint {I : Type*} {A : I → Type*} [DecidableEq I]
-    (s : Profile A) : List (Move A) → Profile A
-  | [] => s
-  | m :: ms => endpoint (Function.update s m.1 m.2) ms
+    (s : Profile A) (ms : List (Move A)) : Profile A :=
+  ms.foldl (fun s m => Function.update s m.1 m.2) s
 
 def pathIntegral {I : Type*} {A : I → Type*} [DecidableEq I]
-    (u : Payoff A) (s : Profile A) : List (Move A) → ℝ
-  | [] => 0
-  | m :: ms => u m.1 (Function.update s m.1 m.2) - u m.1 s +
-      pathIntegral u (Function.update s m.1 m.2) ms
+    (u : Payoff A) (s : Profile A) (ms : List (Move A)) : ℝ :=
+  (ms.foldl (fun p m => (p.1 + u m.1 (Function.update p.2 m.1 m.2) - u m.1 p.2,
+    Function.update p.2 m.1 m.2)) (0, s)).1
 
 def ClosedPathProperty {I : Type*} {A : I → Type*} [DecidableEq I]
     (u : Payoff A) : Prop :=
@@ -65,9 +63,8 @@ def PureNash {I : Type*} {A : I → Type*} [DecidableEq I]
 end Potential
 namespace Potential
 variable {I : Type*} {A : I → Type*} [DecidableEq I]
-def vertices (s : Profile A) : List (Move A) → List (Profile A)
-  | [] => [s]
-  | m :: ms => s :: vertices (Function.update s m.1 m.2) ms
+def vertices (s : Profile A) (ms : List (Move A)) : List (Profile A) :=
+  (ms.foldl (fun p m => (Function.update p.1 m.1 m.2, p.2 ++ [Function.update p.1 m.1 m.2])) (s, [s])).2
 end Potential
 
 namespace Potential
