@@ -82,21 +82,18 @@ def SimpleFourCycleProperty (u : Payoff A) : Prop :=
 end Potential
 
 namespace Potential
-variable {I : Type*} {A : I → Type*} [Fintype I] [DecidableEq I] [∀ i, Nonempty (A i)]
-theorem monderer_shapley_characterization (u : Payoff A) :
+theorem monderer_shapley_characterization {I : Type*} {A : I → Type*} [Fintype I] [DecidableEq I] [∀ i, Nonempty (A i)] (u : Payoff A) :
     ((∃ P : Profile A → ℝ, ExactPotential u P) ↔ ClosedPathProperty u) ∧
     ((∃ P : Profile A → ℝ, ExactPotential u P) ↔ SimpleClosedPathProperty u) ∧
     ((∃ P : Profile A → ℝ, ExactPotential u P) ↔ SimpleFourCycleProperty u) ∧
     ((∃ P : Profile A → ℝ, ExactPotential u P) ↔ FourCycle u) := by
   sorry
 
-variable {I : Type*} {A : I → Type*} [Fintype I] [DecidableEq I] [∀ i, Nonempty (A i)]
-theorem fourCycle_exists_pureNash [∀ i, Fintype (A i)] (u : Payoff A)
+theorem fourCycle_exists_pureNash {I : Type*} {A : I → Type*} [Fintype I] [DecidableEq I] [∀ i, Nonempty (A i)] [∀ i, Fintype (A i)] (u : Payoff A)
     (hu : FourCycle u) : ∃ s : Profile A, PureNash u s := by
   sorry
 
-variable {I : Type*} {A : I → Type*} [DecidableEq I]
-theorem exactPotential_unique [Fintype I] [∀ i, Nonempty (A i)]
+theorem exactPotential_unique {I : Type*} {A : I → Type*} [DecidableEq I] [Fintype I] [∀ i, Nonempty (A i)]
     (u : Payoff A) (P Q : Profile A → ℝ)
     (hp : ExactPotential u P) (hq : ExactPotential u Q) :
     ∃ c : ℝ, ∀ s, P s = Q s + c := by
